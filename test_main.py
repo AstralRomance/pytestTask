@@ -3,8 +3,20 @@ import requests
 import itertools
 import string
 import json
+import datetime
+import dateutil.parser
 
 SW_API_BASE_LINK = 'https://swapi.dev/api'
+
+#TASK 10
+def symbol_return_test():
+    symbols = [lt for lt in string.ascii_lowercase]
+    symbols.extend([str(n) for n in range(10)])
+    symbols.append('')
+    api_sections = [''.join((section, '?search=')) for section in ['/people/', '/films/', '/starships/', '/vehicles/', '/species/', 'planets']]
+    api_requests = [''.join(parameter) for parameter in itertools.product(api_sections, symbols)]
+    api_requests = [''.join((SW_API_BASE_LINK, parameter)) for parameter in api_requests]
+    return api_requests
 
 # TASK 1
 @pytest.fixture()
@@ -35,16 +47,6 @@ def people_search(search_parameters):
     swapi_request = requests.get(swapi_link)
     return swapi_request.json()
 
-#TASK 10
-def symbol_return_test():
-    symbols = [lt for lt in string.ascii_lowercase]
-    symbols.extend([str(n) for n in range(10)])
-    symbols.append('')
-    api_sections = [''.join((section, '?search=')) for section in ['/people/', '/films/', '/starships/', '/vehicles/', '/species/', 'planets']]
-    api_requests = [''.join(parameter) for parameter in itertools.product(api_sections, symbols)]
-    api_requests = [''.join((SW_API_BASE_LINK, parameter)) for parameter in api_requests]
-    return api_requests
-
 #TASK 2
 def test_count(get_all_people):
     swapi_link = ''.join((SW_API_BASE_LINK, f'/people'))
@@ -54,7 +56,6 @@ def test_count(get_all_people):
 #TASK 3
 def test_unique_names(get_all_people):
     names = [name['name'] for name in get_all_people]
-    print(names)
     assert len(names) == len(set(names))
 
 #TASK 4
@@ -109,3 +110,52 @@ def test_symbol(request_link):
         print('REQUEST TO ROOT API SECTIONS HAS NO COUNT KEY')
 
 #TASK 11
+def get_people_list():
+    all_people = []
+    for page in itertools.count(1):
+        swapi_link = ''.join((SW_API_BASE_LINK,f'/people/?page={page}'))
+        swapi_request = requests.get(swapi_link)
+        if swapi_request.status_code == 404:
+            break
+        all_people.extend(swapi_request.json()['results'])
+    return all_people
+
+#CHECK
+@pytest.mark.parametrize('character', get_people_list())
+def test_height_valid_data(character):
+    try:
+        assert int(character['height']) >= 0
+    except ValueError:
+        pytest.fail(f'Value error while cast height {character}')
+
+@pytest.mark.parametrize('character', get_people_list())
+def test_valid_created_time(character):
+    try:
+        assert isinstance(dateutil.parser.parse(character['created']), datetime.datetime)
+    except dateutil.parser.ParserError:
+        pytest.fail('Date create parsing failed (Invalid date)')
+
+@pytest.mark.parametrize('character', get_people_list())
+def test_valid_edited_time(character):
+    try:
+        assert isinstance(dateutil.parser.parse(character['edited']), datetime.datetime)
+    except dateutil.parser.ParserError:
+        pytest.fail('Date edited parsing failed (invalid or empty date)')
+
+@pytest.mark.parametrize('character', get_people_list())
+def test_films_valid_link(character):
+    valid_links = []
+    for link in character['films']:
+        valid_links.append(requests.get(link).status_code == 200)
+    assert all([is_valid == True for is_valid in valid_links])
+
+@pytest.mark.parametrize('character', get_people_list())
+def test_homeworld_valid_link(character):
+    assert requests.get(character['homeworld']).status_code == 200
+
+@pytest.mark.parametrize('character', get_people_list())
+def test_species_valid_link(character):
+    valid_links = []
+    for link in character['species']:
+        valid_links.append(requests.get(link).status_code == 200)
+    assert all([is_valid == True for is_valid in valid_links])
