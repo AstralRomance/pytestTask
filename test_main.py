@@ -6,7 +6,8 @@ import json
 import datetime
 import dateutil.parser
 
-SW_API_BASE_LINK = 'https://swapi.dev/api'
+from utility import get_people_list
+from utility import SW_API_BASE_LINK
 
 #TASK 10
 def symbol_return_test():
@@ -17,35 +18,6 @@ def symbol_return_test():
     api_requests = [''.join(parameter) for parameter in itertools.product(api_sections, symbols)]
     api_requests = [''.join((SW_API_BASE_LINK, parameter)) for parameter in api_requests]
     return api_requests
-
-# TASK 1
-@pytest.fixture()
-def get_all_people():
-    all_people = []
-    for page in itertools.count(1):
-        swapi_link = ''.join((SW_API_BASE_LINK,f'/people/?page={page}'))
-        swapi_request = requests.get(swapi_link)
-        if swapi_request.status_code == 404:
-            break
-        all_people.extend(swapi_request.json()['results'])
-    return all_people
-
-@pytest.fixture()
-def get_different_case_names():
-    return ['LUKE SKYWALKER', 'Luke Skywalker', 'luke skywalker', 'LuKe SkYwAlKeR']
-
-#TASK 7
-@pytest.fixture()
-def get_people_object_schema():
-    request_link = ''.join((SW_API_BASE_LINK, '/people/schema'))
-    return requests.get(request_link).json()['required']
-
-#TASK 9
-@pytest.fixture()
-def people_search(search_parameters):
-    swapi_link = ''.join((SW_API_BASE_LINK, '/people/', search_parameters))
-    swapi_request = requests.get(swapi_link)
-    return swapi_request.json()
 
 #TASK 2
 def test_count(get_all_people):
@@ -109,25 +81,6 @@ def test_symbol(request_link):
     except json.JSONDecodeError:
         print('REQUEST TO ROOT API SECTIONS HAS NO COUNT KEY')
 
-#TASK 11
-def get_people_list():
-    all_people = []
-    for page in itertools.count(1):
-        swapi_link = ''.join((SW_API_BASE_LINK,f'/people/?page={page}'))
-        swapi_request = requests.get(swapi_link)
-        if swapi_request.status_code == 404:
-            break
-        all_people.extend(swapi_request.json()['results'])
-    return all_people
-
-#CHECK
-@pytest.mark.parametrize('character', get_people_list())
-def test_height_valid_data(character):
-    try:
-        assert int(character['height']) >= 0
-    except ValueError:
-        pytest.fail(f'Value error while cast height {character}')
-
 @pytest.mark.parametrize('character', get_people_list())
 def test_valid_created_time(character):
     try:
@@ -159,3 +112,19 @@ def test_species_valid_link(character):
     for link in character['species']:
         valid_links.append(requests.get(link).status_code == 200)
     assert all([is_valid == True for is_valid in valid_links])
+
+#TASK 12
+def test_people_wookiee_endpoints_response(get_people_wookiee_endpoints):
+    valid_response = []
+    for link in get_people_wookiee_endpoints:
+        valid_response.append(requests.get(link).status_code == 200)
+    assert all([is_valid == True for is_valid in valid_response])
+
+def test_people_wookiee_endpoints_valid_json(get_people_wookiee_endpoints):
+    valid_response = []
+    for link in get_people_wookiee_endpoints:
+        try:
+            valid_response.append(isinstance(requests.get(link).json(),dict))
+        except json.JSONDecodeError:
+            valid_response.append(False)
+    assert all([is_valid == True for is_valid in valid_response])
