@@ -1,23 +1,13 @@
-import pytest
-import requests
 import itertools
 import string
 import json
 import datetime
+import pytest
+import requests
 import dateutil.parser
 
-from utility import get_people_list
 from utility import SW_API_BASE_LINK
-
-#TASK 10
-def symbol_return_test():
-    symbols = [lt for lt in string.ascii_lowercase]
-    symbols.extend([str(n) for n in range(10)])
-    symbols.append('')
-    api_sections = [''.join((section, '?search=')) for section in ['/people/', '/films/', '/starships/', '/vehicles/', '/species/', 'planets']]
-    api_requests = [''.join(parameter) for parameter in itertools.product(api_sections, symbols)]
-    api_requests = [''.join((SW_API_BASE_LINK, parameter)) for parameter in api_requests]
-    return api_requests
+from utility import all_sections_requests, get_people_list
 
 #TASK 2
 def test_count(get_all_people):
@@ -29,7 +19,6 @@ def test_count(get_all_people):
 def test_unique_names(get_all_people):
     names = [name['name'] for name in get_all_people]
     assert len(names) == len(set(names))
-
 #TASK 4
 def test_case_sensivity_valid_data(get_different_case_names):
     responses = []
@@ -67,20 +56,21 @@ def test_check_people_schema(get_all_people, get_people_object_schema):
     is_valid = []
     for people in get_all_people:
         is_valid.append(all(field in people for field in get_people_object_schema)) 
-    assert all(schema==True for schema in is_valid)
+    assert all(schema is True for schema in is_valid)
 
 #TASK 10
-@pytest.mark.parametrize('request_link', symbol_return_test())
+@pytest.mark.parametrize('request_link', all_sections_requests())
 def test_symbol(request_link):
     swapi_request = requests.get(request_link)
-    try:
+    if swapi_request.status_code == 200:
         if request_link[-1] in ['0', '6', '9']:
             assert int(swapi_request.json()['count']) == 0
         else:
             assert int(swapi_request.json()['count']) >= 1
-    except json.JSONDecodeError:
-        print('REQUEST TO ROOT API SECTIONS HAS NO COUNT KEY')
+    else:
+        pytest.fail(f'Request with {swapi_request.status_code} code')
 
+#TASK 11
 @pytest.mark.parametrize('character', get_people_list())
 def test_valid_created_time(character):
     try:
@@ -100,7 +90,7 @@ def test_films_valid_link(character):
     valid_links = []
     for link in character['films']:
         valid_links.append(requests.get(link).status_code == 200)
-    assert all([is_valid == True for is_valid in valid_links])
+    assert all([is_valid is True for is_valid in valid_links])
 
 @pytest.mark.parametrize('character', get_people_list())
 def test_homeworld_valid_link(character):
@@ -111,14 +101,14 @@ def test_species_valid_link(character):
     valid_links = []
     for link in character['species']:
         valid_links.append(requests.get(link).status_code == 200)
-    assert all([is_valid == True for is_valid in valid_links])
+    assert all([is_valid is True for is_valid in valid_links])
 
 #TASK 12
 def test_people_wookiee_endpoints_response(get_people_wookiee_endpoints):
     valid_response = []
     for link in get_people_wookiee_endpoints:
         valid_response.append(requests.get(link).status_code == 200)
-    assert all([is_valid == True for is_valid in valid_response])
+    assert all([is_valid is True for is_valid in valid_response])
 
 def test_people_wookiee_endpoints_valid_json(get_people_wookiee_endpoints):
     valid_response = []
@@ -127,4 +117,4 @@ def test_people_wookiee_endpoints_valid_json(get_people_wookiee_endpoints):
             valid_response.append(isinstance(requests.get(link).json(),dict))
         except json.JSONDecodeError:
             valid_response.append(False)
-    assert all([is_valid == True for is_valid in valid_response])
+    assert all([is_valid is True for is_valid in valid_response])
